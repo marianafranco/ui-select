@@ -1305,6 +1305,8 @@
 
         $select.allowClear = (angular.isDefined(attrs.allowClear)) ? (attrs.allowClear === '') ? true : (attrs.allowClear.toLowerCase() === 'true') : false;
 
+        $select.selectText =  attrs.selectText;
+
         if($select.multiple){
           $select.sizeSearchInput();
         }
