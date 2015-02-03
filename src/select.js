@@ -173,6 +173,7 @@
     var EMPTY_SEARCH = '';
 
     ctrl.placeholder = undefined;
+    ctrl.placeholderActive = undefined;
     ctrl.search = EMPTY_SEARCH;
     ctrl.activeIndex = 0;
     ctrl.activeMatchIndex = -1;
@@ -513,7 +514,7 @@
 
     ctrl.getPlaceholder = function(){
       //Refactor single?
-      if(ctrl.multiple && ctrl.selected.length) return;
+      if(ctrl.multiple && ctrl.selected.length) return ctrl.placeholderActive;
       return ctrl.placeholder;
     };
 
@@ -1305,7 +1306,7 @@
 
         $select.allowClear = (angular.isDefined(attrs.allowClear)) ? (attrs.allowClear === '') ? true : (attrs.allowClear.toLowerCase() === 'true') : false;
 
-        $select.selectText =  attrs.selectText;
+        $select.placeholderActive =  attrs.placeholderActive;
 
         if($select.multiple){
           $select.sizeSearchInput();
