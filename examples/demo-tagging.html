@@ -65,8 +65,8 @@
   <h1>Tagging Demos</h1>
 
   <h3>Simple String Tags</h3>
-  <h4>(With Custom Tag Label)</h4>
-  <ui-select multiple tagging tagging-label="(custom 'new' label)" ng-model="multipleDemo.colors" theme="bootstrap" ng-disabled="disabled" style="width: 300px;" title="Choose a color">
+  <h4>(With Custom Tag Label / Sort Enabled)</h4>
+  <ui-select multiple tagging tagging-label="(custom 'new' label)" ng-model="multipleDemo.colors" theme="bootstrap" sortable="true" ng-disabled="disabled" style="width: 300px;" title="Choose a color">
     <ui-select-match placeholder="Select colors...">{{$item}}</ui-select-match>
     <ui-select-choices repeat="color in availableColors | filter:$select.search">
       {{color}}
@@ -115,6 +115,30 @@
     </ui-select-choices>
   </ui-select>
   <p>Selected: {{multipleDemo.selectedPeople2}}</p>
+
+  <h3>Tagging without multiple</h3>
+  <ui-select tagging="tagTransform" ng-model="person.selected" theme="bootstrap" ng-disabled="disabled" style="width: 800px;" title="Choose a person">
+  <ui-select-match placeholder="Select person...">{{$select.selected.name}} &lt;{{$select.selected.email}}&gt;</ui-select-match>
+  <ui-select-choices repeat="person in people | propsFilter: {name: $select.search, age: $select.search}">
+    <div ng-if="person.isTag" ng-bind-html="person.name +' <small>(new)</small>'| highlight: $select.search"></div>
+    <div ng-if="!person.isTag" ng-bind-html="person.name + person.isTag| highlight: $select.search"></div>
+    <small>
+      email: {{person.email}}
+      age: <span ng-bind-html="''+person.age | highlight: $select.search"></span>
+    </small>
+  </ui-select-choices>
+  </ui-select>
+  <p>Selected: {{person.selected}}</p>
+
+  <h3>Tagging without multiple, with simple strings</h3>
+  <ui-select tagging tagging-label="('new')" ng-model="singleDemo.color" theme="bootstrap" style="width: 800px;" title="Choose a color">
+    <ui-select-match placeholder="Select color...">{{$select.selected}}</ui-select-match>
+    <ui-select-choices repeat="color in availableColors | filter: $select.search">
+      <div ng-bind-html="color | highlight: $select.search"></div>
+    </ui-select-choices>
+  </ui-select>
+  <p>Selected: {{singleDemo.color}}</p>
+
 
   <div style="height:500px"></div>
 

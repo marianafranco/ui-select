@@ -15,7 +15,39 @@ describe('ui-select tests', function() {
     Escape: 27
   };
 
-  beforeEach(module('ngSanitize', 'ui.select'));
+  //create a directive that wraps ui-select
+  angular.module('wrapperDirective',['ui.select']);
+  angular.module('wrapperDirective').directive('wrapperUiSelect', function(){
+    return {
+      restrict: 'EA',
+      template: '<ui-select> \
+            <ui-select-match placeholder="Pick one...">{{$select.selected.name}}</ui-select-match> \
+            <ui-select-choices repeat="person in people | filter: $select.search"> \
+              <div ng-bind-html="person.name | highlight: $select.search"></div> \
+            </ui-select-choices> \
+          </ui-select>',
+      require: 'ngModel',
+      scope: true,
+
+      link: function (scope, element, attrs, ctrl) {
+
+      }
+    }
+
+  });
+
+  beforeEach(module('ngSanitize', 'ui.select', 'wrapperDirective'));
+
+  beforeEach(function() {
+    module(function($provide) {
+      $provide.factory('uisOffset', function() {
+        return function(el) {
+          return {top: 100, left: 200, width: 300, height: 400};
+        };
+      });
+    });
+  });
+
   beforeEach(inject(function(_$rootScope_, _$compile_, _$timeout_, _$injector_) {
     $rootScope = _$rootScope_;
     scope = $rootScope.$new();
@@ -62,19 +94,23 @@ describe('ui-select tests', function() {
   }
 
   function createUiSelect(attrs) {
-    var attrsHtml = '';
+    var attrsHtml = '',
+        matchAttrsHtml = '';
     if (attrs !== undefined) {
       if (attrs.disabled !== undefined) { attrsHtml += ' ng-disabled="' + attrs.disabled + '"'; }
       if (attrs.required !== undefined) { attrsHtml += ' ng-required="' + attrs.required + '"'; }
       if (attrs.theme !== undefined) { attrsHtml += ' theme="' + attrs.theme + '"'; }
       if (attrs.tabindex !== undefined) { attrsHtml += ' tabindex="' + attrs.tabindex + '"'; }
       if (attrs.tagging !== undefined) { attrsHtml += ' tagging="' + attrs.tagging + '"'; }
+      if (attrs.taggingTokens !== undefined) { attrsHtml += ' tagging-tokens="' + attrs.taggingTokens + '"'; }
       if (attrs.title !== undefined) { attrsHtml += ' title="' + attrs.title + '"'; }
+      if (attrs.appendToBody != undefined) { attrsHtml += ' append-to-body="' + attrs.appendToBody + '"'; }
+      if (attrs.allowClear != undefined) { matchAttrsHtml += ' allow-clear="' + attrs.allowClear + '"';}
     }
 
     return compileTemplate(
       '<ui-select ng-model="selection.selected"' + attrsHtml + '> \
-        <ui-select-match placeholder="Pick one...">{{$select.selected.name}}</ui-select-match> \
+        <ui-select-match placeholder="Pick one..."' + matchAttrsHtml + '>{{$select.selected.name}}</ui-select-match> \
         <ui-select-choices repeat="person in people | filter: $select.search"> \
           <div ng-bind-html="person.name | highlight: $select.search"></div> \
           <div ng-bind-html="person.email | highlight: $select.search"></div> \
@@ -84,7 +120,7 @@ describe('ui-select tests', function() {
   }
 
   function getMatchLabel(el) {
-    return $(el).find('.ui-select-match > button:first > span[ng-transclude]:not(.ng-hide)').text();
+    return $(el).find('.ui-select-match > span:first > span[ng-transclude]:not(.ng-hide)').text();
   }
 
   function clickItem(el, text) {
@@ -98,7 +134,7 @@ describe('ui-select tests', function() {
   }
 
   function clickMatch(el) {
-    $(el).find('.ui-select-match > button:first').click();
+    $(el).find('.ui-select-match > span:first').click();
     scope.$digest();
   }
 
@@ -115,6 +151,17 @@ describe('ui-select tests', function() {
     e.keyCode = keyCode;
     element.trigger(e);
   }
+  function triggerPaste(element, text) {
+    var e = jQuery.Event("paste");
+    e.originalEvent = {
+        clipboardData : {
+            getData : function() {
+                return text;
+            }
+        }
+    };
+    element.trigger(e);
+  }
 
   function setSearchText(el, text) {
     el.scope().$select.search = text;
@@ -127,6 +174,12 @@ describe('ui-select tests', function() {
     $select.open = true;
     scope.$digest();
   };
+
+  function closeDropdown(el) {
+    var $select = el.scope().$select;
+    $select.open = false;
+    scope.$digest();
+  }
 
 
   // Tests
@@ -172,6 +225,13 @@ describe('ui-select tests', function() {
     scope.selection.selected =  { name: 'Samantha',  email: 'something different than array source',  group: 'bar', age: 30 };
     scope.$digest();
     expect(getMatchLabel(el)).toEqual('Samantha');
+  });
+
+  it('should utilize wrapper directive ng-model', function() {
+    var el = compileTemplate('<wrapper-ui-select ng-model="selection.selected"/>');
+    scope.selection.selected =  { name: 'Samantha',  email: 'something different than array source',  group: 'bar', age: 30 };
+    scope.$digest();
+    expect($(el).find('.ui-select-container > .ui-select-match > span:first > span[ng-transclude]:not(.ng-hide)').text()).toEqual('Samantha');
   });
 
   it('should display the choices when activated', function() {
@@ -238,6 +298,43 @@ describe('ui-select tests', function() {
     expect($select.open).toEqual(false);
   });
 
+  it('should clear selection', function() {
+    scope.selection.selected = scope.people[0];
+
+    var el = createUiSelect({theme : 'select2', allowClear: 'true'});
+    var $select = el.scope().$select;
+
+    // allowClear should be true.
+    expect($select.allowClear).toEqual(true);
+
+    // Trigger clear.
+    el.find('.select2-search-choice-close').click();
+    expect(scope.selection.selected).toEqual(undefined);
+
+    // If there is no selection it the X icon should be gone.
+    expect(el.find('.select2-search-choice-close').length).toEqual(0);
+
+  });
+
+  it('should toggle allow-clear directive', function() {
+    scope.selection.selected = scope.people[0];
+    scope.isClearAllowed = false;
+    
+    var el = createUiSelect({theme : 'select2', allowClear: '{{isClearAllowed}}'});
+    var $select = el.scope().$select;
+
+    expect($select.allowClear).toEqual(false);
+    expect(el.find('.select2-search-choice-close').length).toEqual(0);
+    
+    // Turn clear on
+    scope.isClearAllowed = true;
+    scope.$digest();
+
+    expect($select.allowClear).toEqual(true);
+    expect(el.find('.select2-search-choice-close').length).toEqual(1);
+  });
+
+
   it('should pass tabindex to focusser', function() {
     var el = createUiSelect({tabindex: 5});
 
@@ -275,6 +372,21 @@ describe('ui-select tests', function() {
     expect(el3.scope().$select.disabled).toBeFalsy();
     clickMatch(el3);
     expect(isDropdownOpened(el3)).toEqual(true);
+  });
+
+  it('should allow decline tags when tagging function returns null', function() {
+    scope.taggingFunc = function (name) {
+      return null;
+    };
+
+    var el = createUiSelect({tagging: 'taggingFunc'});
+    clickMatch(el);
+
+    $(el).scope().$select.search = 'idontexist';
+    $(el).scope().$select.activeIndex = 0;
+    $(el).scope().$select.select('idontexist');
+
+    expect($(el).scope().$select.selected).not.toBeDefined();
   });
 
   it('should allow tagging if the attribute says so', function() {
@@ -1119,6 +1231,8 @@ describe('ui-select tests', function() {
             if (attrs.required !== undefined) { attrsHtml += ' ng-required="' + attrs.required + '"'; }
             if (attrs.tabindex !== undefined) { attrsHtml += ' tabindex="' + attrs.tabindex + '"'; }
             if (attrs.closeOnSelect !== undefined) { attrsHtml += ' close-on-select="' + attrs.closeOnSelect + '"'; }
+            if (attrs.tagging !== undefined) { attrsHtml += ' tagging="' + attrs.tagging + '"'; }
+            if (attrs.taggingTokens !== undefined) { attrsHtml += ' tagging-tokens="' + attrs.taggingTokens + '"'; }
         }
 
         return compileTemplate(
@@ -1211,7 +1325,7 @@ describe('ui-select tests', function() {
         expect(isDropdownOpened(el)).toEqual(false);
         triggerKeydown(searchInput, Key.Backspace);
         expect(isDropdownOpened(el)).toEqual(false);
-        expect(el.scope().$select.activeMatchIndex).toBe(el.scope().$select.selected.length - 1);
+        expect(el.scope().$selectMultiple.activeMatchIndex).toBe(el.scope().$select.selected.length - 1);
 
     });
 
@@ -1227,7 +1341,7 @@ describe('ui-select tests', function() {
         triggerKeydown(searchInput, Key.Backspace);
         expect(el.scope().$select.selected).toEqual([scope.people[4], scope.people[6]]); //Wladimir & Nicole
 
-        expect(el.scope().$select.activeMatchIndex).toBe(0);
+        expect(el.scope().$selectMultiple.activeMatchIndex).toBe(0);
 
     });
 
@@ -1243,7 +1357,7 @@ describe('ui-select tests', function() {
         triggerKeydown(searchInput, Key.Delete);
         expect(el.scope().$select.selected).toEqual([scope.people[4], scope.people[6]]); //Wladimir & Nicole
 
-        expect(el.scope().$select.activeMatchIndex).toBe(1);
+        expect(el.scope().$selectMultiple.activeMatchIndex).toBe(1);
 
     });
 
@@ -1255,7 +1369,7 @@ describe('ui-select tests', function() {
         expect(isDropdownOpened(el)).toEqual(false);
         triggerKeydown(searchInput, Key.Left);
         expect(isDropdownOpened(el)).toEqual(false);
-        expect(el.scope().$select.activeMatchIndex).toBe(el.scope().$select.selected.length - 1);
+        expect(el.scope().$selectMultiple.activeMatchIndex).toBe(el.scope().$select.selected.length - 1);
 
     });
 
@@ -1269,37 +1383,37 @@ describe('ui-select tests', function() {
         triggerKeydown(searchInput, Key.Left)
         triggerKeydown(searchInput, Key.Left)
         expect(isDropdownOpened(el)).toEqual(false);
-        expect(el.scope().$select.activeMatchIndex).toBe(el.scope().$select.selected.length - 2);
+        expect(el.scope().$selectMultiple.activeMatchIndex).toBe(el.scope().$select.selected.length - 2);
         triggerKeydown(searchInput, Key.Left)
         triggerKeydown(searchInput, Key.Left)
         triggerKeydown(searchInput, Key.Left)
-        expect(el.scope().$select.activeMatchIndex).toBe(0);
+        expect(el.scope().$selectMultiple.activeMatchIndex).toBe(0);
 
     });
 
-    it('should decrease $select.activeMatchIndex when pressing LEFT key', function() {
+    it('should decrease $selectMultiple.activeMatchIndex when pressing LEFT key', function() {
 
         scope.selection.selectedMultiple = [scope.people[4], scope.people[5], scope.people[6]]; //Wladimir, Samantha & Nicole
         var el = createUiSelectMultiple();
         var searchInput = el.find('.ui-select-search');
 
-        el.scope().$select.activeMatchIndex = 3
+        el.scope().$selectMultiple.activeMatchIndex = 3
         triggerKeydown(searchInput, Key.Left)
         triggerKeydown(searchInput, Key.Left)
-        expect(el.scope().$select.activeMatchIndex).toBe(1);
+        expect(el.scope().$selectMultiple.activeMatchIndex).toBe(1);
 
     });
 
-    it('should increase $select.activeMatchIndex when pressing RIGHT key', function() {
+    it('should increase $selectMultiple.activeMatchIndex when pressing RIGHT key', function() {
 
         scope.selection.selectedMultiple = [scope.people[4], scope.people[5], scope.people[6]]; //Wladimir, Samantha & Nicole
         var el = createUiSelectMultiple();
         var searchInput = el.find('.ui-select-search');
 
-        el.scope().$select.activeMatchIndex = 0
+        el.scope().$selectMultiple.activeMatchIndex = 0
         triggerKeydown(searchInput, Key.Right)
         triggerKeydown(searchInput, Key.Right)
-        expect(el.scope().$select.activeMatchIndex).toBe(2);
+        expect(el.scope().$selectMultiple.activeMatchIndex).toBe(2);
 
     });
 
@@ -1611,6 +1725,40 @@ describe('ui-select tests', function() {
 
       expect(el.scope().$select.multiple).toBe(true);
     });
+
+    it('should allow paste tag from clipboard', function() {
+       scope.taggingFunc = function (name) {
+         return {
+           name: name,
+           email: name + '@email.com',
+           group: 'Foo',
+           age: 12
+         };
+       };
+
+       var el = createUiSelectMultiple({tagging: 'taggingFunc', taggingTokens: ",|ENTER"});
+       clickMatch(el);
+       triggerPaste(el.find('input'), 'tag1');
+
+       expect($(el).scope().$select.selected.length).toBe(1);
+    });
+
+    it('should allow paste multiple tags', function() {
+      scope.taggingFunc = function (name) {
+        return {
+          name: name,
+          email: name + '@email.com',
+          group: 'Foo',
+          age: 12
+        };
+      };
+
+      var el = createUiSelectMultiple({tagging: 'taggingFunc', taggingTokens: ",|ENTER"});
+      clickMatch(el);
+      triggerPaste(el.find('input'), ',tag1,tag2,tag3,,tag5,');
+
+      expect($(el).scope().$select.selected.length).toBe(5);
+    });
   });
 
   describe('default configuration via uiSelectConfig', function() {
@@ -1700,4 +1848,60 @@ describe('ui-select tests', function() {
       }
     });
   });
+
+  describe('select with the append to body option', function() {
+    var body;
+
+    beforeEach(inject(function($document) {
+      body = $document.find('body')[0];
+    }));
+
+    it('should only be moved to the body when the appendToBody option is true', function() {
+      var el = createUiSelect({appendToBody: false});
+      openDropdown(el);
+      expect(el.parent()[0]).not.toBe(body);
+    });
+
+    it('should be moved to the body when the appendToBody is true in uiSelectConfig', inject(function(uiSelectConfig) {
+      uiSelectConfig.appendToBody = true;
+      var el = createUiSelect();
+      openDropdown(el);
+      expect(el.parent()[0]).toBe(body);
+    }));
+
+    it('should be moved to the body when opened', function() {
+      var el = createUiSelect({appendToBody: true});
+      openDropdown(el);
+      expect(el.parent()[0]).toBe(body);
+      closeDropdown(el);
+      expect(el.parent()[0]).not.toBe(body);
+    });
+
+    it('should remove itself from the body when the scope is destroyed', function() {
+      var el = createUiSelect({appendToBody: true});
+      openDropdown(el);
+      expect(el.parent()[0]).toBe(body);
+      el.scope().$destroy();
+      expect(el.parent()[0]).not.toBe(body);
+    });
+
+    it('should have specific position and dimensions', function() {
+      var el = createUiSelect({appendToBody: true});
+      var originalPosition = el.css('position');
+      var originalTop = el.css('top');
+      var originalLeft = el.css('left');
+      var originalWidth = el.css('width');
+      openDropdown(el);
+      expect(el.css('position')).toBe('absolute');
+      expect(el.css('top')).toBe('100px');
+      expect(el.css('left')).toBe('200px');
+      expect(el.css('width')).toBe('300px');
+      closeDropdown(el);
+      expect(el.css('position')).toBe(originalPosition);
+      expect(el.css('top')).toBe(originalTop);
+      expect(el.css('left')).toBe(originalLeft);
+      expect(el.css('width')).toBe(originalWidth);
+    });
+  });
+
 });

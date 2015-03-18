@@ -16,12 +16,13 @@
         aria-label="{{ $select.baseTitle }}"
         aria-activedescendant="ui-select-choices-row-{{ $select.generatedId }}-{{ $select.activeIndex }}"
         class="select2-input ui-select-search"
-        placeholder="{{$select.getPlaceholder()}}"
+        placeholder="{{$selectMultiple.getPlaceholder()}}"
         ng-disabled="$select.disabled"
         ng-hide="$select.disabled"
         ng-model="$select.search"
         ng-click="$select.activate()"
-        style="width: 34px;">
+        style="width: 34px;"
+        ondrop="return false;">
     </li>
   </ul>
   <div class="select2-drop select2-with-searchbox select2-drop-active"
